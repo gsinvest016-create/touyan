@@ -302,8 +302,8 @@ function renderStock(code) {
     if (!a.ok) { body.innerHTML = '<div class="errbox">' + esc(a.error) + '</div>'; return; }
     var act = composeAction(code, a, m, ci, seasons, settle, ps, other);
     body.innerHTML = RU.quote(code, a, m, state.tf, tags) +
-      '<div class="hero">' + actionCard(code, a, m, act) + ladderCard(a, m) + '</div>' +
-      '<div class="two"><div class="stack">' + RU.chartCard(a, state.tf, state.range, 'S') + RU.perfCard(a, m) + chainCard(code, m, ci) + RU.patterns(a) + RU.vcp(a) + '</div>' +
+      '<div class="hero">' + RU.chartCard(a, state.tf, state.range, 'S') + ladderCard(a, m) + '</div>' +
+      '<div class="two"><div class="stack">' + actionCard(code, a, m, act) + RU.perfCard(a, m) + chainCard(code, m, ci) + RU.patterns(a) + RU.vcp(a) + '</div>' +
       '<div class="stack">' + seasonCard(m) + (settle ? settleCard() : '') + RU.td(a, true) + RU.position(a) + RU.volume(a, m) + '</div></div>' +
       peersCard(code, m, ci) +
       '<div class="linkrow"><a href="#/ideas/' + esc(code) + '">新聞 → 交易策略</a><a href="#/radar">型態雷達：訊號掃描</a><a href="#/supply/' + esc(code) + '">供應鏈地圖</a><a href="#/season">週季節性</a>' + (m.m === 'TW' ? '<a href="#/settle">月結算效應</a>' : '') + '</div>';
