@@ -109,6 +109,9 @@ function mkDrawCurve(canvas, bt) {
 function mkCurrentExposure() { var D = Store.portfolio.data; if (D.exposure != null && D.exposure !== '') return { v: +D.exposure, src: 'manual' }; return null; }
 function mkModel() {
   var tw = mkBars('TWII'), otc = mkBars('TWOII'); if (!tw) return null;
+  // 櫃買資料若比加權落後超過 5 天（抓取失敗、沿用舊檔），不採用，避免用過期數字算水位
+  var otcStale = null;
+  if (otc && otc.length) { var dT = new Date(tw[tw.length - 1].d), dO = new Date(otc[otc.length - 1].d); if ((dT - dO) / 86400000 > 5) { otcStale = otc[otc.length - 1].d; otc = null; } }
   var twS = mkIndexState(tw, tw.length - 1), otcS = otc ? mkIndexState(otc, otc.length - 1) : null, br = mkBreadth(), r20 = mkRatio20(tw, otc);
   var cb = mkCombine(twS, otcS, br, r20);
   var cur = mkCurrentExposure(), act;
@@ -118,7 +121,7 @@ function mkModel() {
   else if (cur.v - cb.expo >= 15) act = { k: 'cut', t: '減碼', d: '從 ' + cur.v + '% 減到 ' + cb.expo + '%：先砍虧損最大、最弱勢的部位' };
   else act = { k: 'hold', t: '維持', d: '目前 ' + cur.v + '% 與建議 ' + cb.expo + '% 相近，不動；照下方價位表執行' };
   var lvTW = mkLevels(tw, otc, br, r20, true), lvOTC = otc ? mkLevels(otc, tw, br, r20, false) : null;
-  return { tw: tw, otc: otc, twS: twS, otcS: otcS, br: br, r20: r20, cb: cb, cur: cur, act: act, lvTW: lvTW, lvOTC: lvOTC, date: tw[tw.length - 1].d };
+  return { tw: tw, otc: otc, twS: twS, otcS: otcS, br: br, r20: r20, cb: cb, cur: cur, act: act, lvTW: lvTW, lvOTC: lvOTC, date: tw[tw.length - 1].d, otcStale: otcStale };
 }
 function mkIndexCard(key, bars, st, lv) {
   var c = st.c, chg = (c / bars[bars.length - 2].c - 1) * 100;
@@ -144,7 +147,7 @@ function renderMarket() {
     '<div class="scores" style="margin-top:14px"><div>總分<b>' + cb.S + ' / 100</b><div class="bar"><i style="width:' + cb.S + '%"></i></div></div><div>加權指數（60%）<b>' + cb.sTW + '</b>趨勢 ' + M.twS.trend + ' ＋ 波動籌碼 ' + M.twS.volSc + '<div class="bar"><i style="width:' + cb.sTW + '%"></i></div></div><div>櫃買指數（25%）<b>' + (M.otcS ? cb.sOTC : '—') + '</b>' + (M.otcS ? '趨勢 ' + M.otcS.trend + ' ＋ 波動籌碼 ' + M.otcS.volSc : '無資料，以加權代替') + '<div class="bar"><i style="width:' + cb.sOTC + '%"></i></div></div><div>市場廣度（15%）<b>' + (M.br ? cb.sBR : '—') + '</b>' + (M.br ? '上升期 ' + M.br.pUp.toFixed(0) + '% · 多訊號 ' + M.br.pSig.toFixed(0) + '% · 新高 ' + M.br.nh + '／新低 ' + M.br.nl + (M.br.weak ? '（樣本少）' : '') : '無掃描資料') + '<div class="bar"><i style="width:' + cb.sBR + '%"></i></div></div><div>櫃買 vs 加權（20 日）<b class="' + (M.r20 > 1 ? 'up' : M.r20 < -1 ? 'dn' : '') + '">' + (M.r20 == null ? '—' : fmt.pct(M.r20, 1)) + '</b>' + (M.r20 == null ? '' : M.r20 > 1 ? '中小型股領漲，風險偏好高' : M.r20 < -1 ? '中小型股落後，資金退潮' : '同步') + '</div></div>' +
     (cb.caps.length || cb.floors.length ? '<div class="note">' + cb.caps.map(function (x) { return '上限 ' + x.v + '%：' + x.why; }).concat(cb.floors.map(function (x) { return '下限 ' + x.v + '%：' + x.why; })).join('；') + '。</div>' : '') + '</div>';
   // 兩個指數
-  html += '<div class="two-eq" style="margin-top:14px">' + mkIndexCard('TWII', M.tw, M.twS, M.lvTW) + (M.otc ? mkIndexCard('TWOII', M.otc, M.otcS, M.lvOTC) : '<div class="card"><h3>櫃買指數</h3><div class="note" style="margin:0">尚無櫃買指數資料。</div></div>') + '</div>';
+  html += '<div class="two-eq" style="margin-top:14px">' + mkIndexCard('TWII', M.tw, M.twS, M.lvTW) + (M.otc ? mkIndexCard('TWOII', M.otc, M.otcS, M.lvOTC) : '<div class="card"><h3>櫃買指數</h3><div class="note" style="margin:0">' + (M.otcStale ? '櫃買指數資料停在 ' + esc(M.otcStale) + '（本次抓取失敗），為避免用過期數字，水位暫時只用加權指數與廣度計算。' : '尚無櫃買指數資料。') + '</div></div>') + '</div>';
   // 執行規則
   html += '<div class="card" style="margin-top:14px"><h3>執行規則（照表做，不臨場判斷）</h3><div class="rule"><b>水位怎麼算</b>總分 ≥80 → 100%；65–79 → 80%；50–64 → 60%；35–49 → 40%；20–34 → 20%；&lt;20 → 清倉。加權在下彎季線之下上限 40%、在年線之下上限 20%、25 日內 ≥5 個分配日上限 50%、櫃買跌破季線而加權未破上限 60%；出現反彈確認日至少 40%。</div><div class="rule"><b>什麼時候動</b>建議值與目前水位差 ≥15% 才動作；差不到 40% 的調整要連續 3 天同一建議再做，差 ≥40%（例如跌破季線、年線）當天收盤確認、隔天開盤就做。</div><div class="rule"><b>減碼順序</b>跌破價位當天收盤確認後隔天執行：先砍虧損中、跌破自身停損、第四階段的部位；獲利中的強勢股最後減。</div><div class="rule"><b>加碼順序</b>突破價位當天收盤確認後，只加交易點子頁通過檢核（≥5 項有利、期望值為正）的標的，分兩批；水位到達建議值就停，不因為「感覺會噴」超過。</div><div class="rule"><b>清倉條件</b>建議水位 0%（加權跌破年線且年線下彎、季線下彎）。清倉後不猜底；等反彈確認日或站回季線且分配日 ≤2 才重新進場，第一批 20–40%。</div></div>';
   // 回測
