@@ -66,6 +66,8 @@ function hmAnalyze(bars, it, tf) {
     if (isSell && S0.mean > 0.3 && S0.up >= 55) { if (v.k === 'risk2') v = { k: 'risk1', t: '留意風險' }; else if (v.k === 'risk1') v = { k: 'watch', t: '短線整理' }; why.push('但這個標的過去 ' + S0.n + ' 次' + stat.label + '後 ' + hTxt + '平均仍 ' + fmt.pct(S0.mean, 1) + '、上漲機率 ' + Math.round(S0.up) + '%：比較像短暫整理，不一定是頭部'); stat.used = true; }
     else if (!isSell && S0.mean < -0.3 && S0.up <= 45) { if (/buy/.test(v.k)) v = { k: 'watch', t: '謹慎試單' }; why.push('但這個標的過去 ' + S0.n + ' 次' + stat.label + '後 ' + hTxt + '平均 ' + fmt.pct(S0.mean, 1) + '、上漲機率 ' + Math.round(S0.up) + '%：常常還會再跌，別一次買滿'); stat.used = true; }
   }
+  // 殖利率本身沒有「買進／續抱」：改用中性描述，股市含意看「對股市」那顆
+  if (it.yld) { var YT = { '高風險': '殖利率過熱', '留意風險': '殖利率偏高檔', '偏空保守': '殖利率下降中', '可以買進': '殖利率超跌', '偏多續抱': '殖利率上升中', '觀望': '殖利率盤整', '跌深反彈': '殖利率偏低檔', '留意買點': '殖利率偏低檔', '謹慎試單': '殖利率偏低檔', '短線整理': '殖利率高檔整理' }; v = { k: 'watch', t: YT[v.t] || '殖利率盤整' }; }
   return { bars: bars, td: td, maF: maF, maS: maS, fastN: fastN, slowN: slowN, rsi: rs, v: v, why: why, eq: eq, stat: stat, st: st, dd: dd, chg: (b.c / bars[i - 1].c - 1) * 100, h9: h9, h13: h13 };
 }
 function hmDraw(cv, A, range) {
