@@ -664,7 +664,14 @@
   function tradePlan(bars, ind, td, vcp, pats, vol, pos, lv, market) {
     var i = bars.length - 1, b = bars[i], atrV = ind.atr14[i] || (b.h - b.l);
     var plans = [];
-    function mk(o) { o.rr = o.target && o.entry && o.stop && o.entry !== o.stop ? r1(Math.abs(o.target - o.entry) / Math.abs(o.entry - o.stop)) : null; o.riskPct = o.entry && o.stop ? r1(Math.abs(o.entry - o.stop) / o.entry * 100) : null; plans.push(o); }
+    function mk(o) {
+      // 安全檢查：停損必須在進場價的正確一側（多單在下、空單在上），目標也一樣；不對就改用進場價外約 1 個 ATR（至少 3%）
+      if (o.entry && o.stop && ((o.side === 'long' && o.stop >= o.entry) || (o.side === 'short' && o.stop <= o.entry))) {
+        var gap0 = Math.max(atrV || 0, o.entry * 0.03);
+        o.stop = roundTick(o.side === 'long' ? o.entry - gap0 : o.entry + gap0, market, o.side === 'long' ? 'down' : 'up'); o.stopAdjusted = true;
+      }
+      if (o.entry && o.target && ((o.side === 'long' && o.target <= o.entry) || (o.side === 'short' && o.target >= o.entry))) o.target = null;
+      o.rr = o.target && o.entry && o.stop && o.entry !== o.stop ? r1(Math.abs(o.target - o.entry) / Math.abs(o.entry - o.stop)) : null; o.riskPct = o.entry && o.stop ? r1(Math.abs(o.entry - o.stop) / o.entry * 100) : null; plans.push(o); }
     var extended = pos.bias20 != null && pos.bias20 > 12;
     var climaxWarn = vol.climax;
 
@@ -675,7 +682,7 @@
       else if (vcp.status === 'extended_ok') mk({ kind: 'VCP 突破後', side: 'long', action: '可買（樞軸上 8% 內）', priority: 2, score: 75, entry: roundTick(b.c, market), stop: vcp.stop, target: roundTick(vcp.pivot * 1.2, market), why: [vcp.statusText], how: '分批買進，停損放樞軸下方（' + vcp.stop + '），跌破即出。' });
       else if (vcp.status === 'at_pivot') mk({ kind: 'VCP 收縮到位', side: 'long', action: '掛單等突破', priority: 2, score: 80, entry: vcp.entry, stop: vcp.stop, target: roundTick(vcp.pivot * 1.2, market), why: [vcp.statusText, '量縮比 ' + vcp.volDry + '（<0.7 為佳）'], how: '在樞軸點 ' + vcp.pivot + ' 上方一檔掛突破買單（' + vcp.entry + '），需伴隨量 ≥1.5x 均量才追；未突破不進場。停損 ' + vcp.stop + '。' });
       else if (vcp.status === 'forming') mk({ kind: 'VCP 形成中', side: 'long', action: '觀察', priority: 4, score: 55, entry: vcp.entry, stop: vcp.stop, target: roundTick(vcp.pivot * 1.2, market), why: [vcp.statusText], how: '等最後一次收縮量縮、價格靠近樞軸再評估；不提前進場。' });
-      else if (vcp.status === 'extended') mk({ kind: 'VCP 已延伸', side: 'long', action: '勿追高', priority: 5, score: 40, entry: vcp.pivot, stop: vcp.stop, target: null, why: [vcp.statusText], how: '等回測樞軸點 ' + vcp.pivot + ' 附近不破再買。' });
+      else if (vcp.status === 'extended') mk({ kind: 'VCP 已延伸', side: 'long', action: '勿追高', priority: 5, score: 40, entry: vcp.pivot, stop: vcp.stop && vcp.stop < vcp.pivot ? vcp.stop : roundTick(vcp.pivot * 0.93, market, 'down'), target: null, why: [vcp.statusText], how: '等回測樞軸點 ' + vcp.pivot + ' 附近不破再買；回測買進的停損放樞軸下方約 7%。' });
     }
     // 2. 經典形態
     pats.forEach(function (p) {
@@ -685,7 +692,7 @@
       if (st === 'confirmed_vol') mk({ kind: p.name + ' 帶量' + (isLong ? '突破' : '跌破'), side: isLong ? 'long' : 'short', action: isLong ? '進場做多' : '出場／做空', priority: 1, score: base + 30, entry: p.entry, stop: p.stop, target: p.target, why: [p.desc, '今日量 ' + vol.rel20 + 'x'], how: isLong ? '突破' + p.keyName + ' ' + p.keyLevel + ' 確認，可於當日收盤或次日回測不破時進場；停損 ' + p.stop + '。' : '跌破' + p.keyName + ' ' + p.keyLevel + ' 確認，多單應出；空單停損 ' + p.stop + '。' });
       else if (st === 'confirmed') mk({ kind: p.name + (isLong ? ' 突破（量不足）' : ' 跌破'), side: isLong ? 'long' : 'short', action: isLong ? '試單' : '減碼／觀察做空', priority: 2, score: base + 15, entry: p.entry, stop: p.stop, target: p.target, why: [p.desc, isLong ? '量僅 ' + vol.rel20 + 'x，需補量確認' : '量 ' + vol.rel20 + 'x'], how: isLong ? '小量試單，補量再加碼；收盤跌回' + p.keyName + '下方停損。' : '多單先減碼；反彈不過' + p.keyName + '時空單進場。' });
       else if (st === 'forming') mk({ kind: p.name + '（形成中）', side: isLong ? 'long' : 'short', action: '等' + (isLong ? '突破' : '跌破') + p.keyName, priority: 3, score: base, entry: p.entry, stop: p.stop, target: p.target, why: [p.desc], how: (isLong ? '在 ' + p.keyName + ' ' + p.keyLevel + ' 上方掛突破買單，需帶量（≥1.5x）；' : '跌破 ' + p.keyName + ' ' + p.keyLevel + ' 時多單出場／空單進場；') + '停損 ' + p.stop + '。' });
-      else if (st === 'after') mk({ kind: p.name + '（已' + (isLong ? '突破' : '跌破') + '）', side: isLong ? 'long' : 'short', action: isLong ? '回測不破可買' : '反彈不過可空', priority: 3, score: base + 5, entry: p.keyLevel, stop: p.stop, target: p.target, why: [p.desc, '現價距' + p.keyName + ' ' + r1(pct(b.c, p.keyLevel)) + '%'], how: isLong ? '等回測 ' + p.keyName + ' ' + p.keyLevel + ' 附近不破再進，不追高。' : '反彈至 ' + p.keyName + ' 附近不過再空。' });
+      else if (st === 'after') mk({ kind: p.name + '（已' + (isLong ? '突破' : '跌破') + '）', side: isLong ? 'long' : 'short', action: isLong ? '回測不破可買' : '反彈不過可空', priority: 3, score: base + 5, entry: p.keyLevel, stop: isLong ? (p.stop && p.stop < p.keyLevel ? p.stop : roundTick(p.keyLevel - Math.max(atrV, p.keyLevel * 0.03), market, 'down')) : (p.stop && p.stop > p.keyLevel ? p.stop : roundTick(p.keyLevel + Math.max(atrV, p.keyLevel * 0.03), market, 'up')), target: p.target, why: [p.desc, '現價距' + p.keyName + ' ' + r1(pct(b.c, p.keyLevel)) + '%'], how: isLong ? '等回測 ' + p.keyName + ' ' + p.keyLevel + ' 附近不破再進，不追高。' : '反彈至 ' + p.keyName + ' 附近不過再空。' });
     });
     // 3a. 神奇十三轉（TD Countdown 13 完成）
     if (td.recentCountdown) {
