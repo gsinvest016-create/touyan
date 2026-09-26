@@ -112,10 +112,10 @@ document.addEventListener('keydown', function (e) { if (e.key === '/' && documen
 function goStock(code) { suggEl.hidden = true; qEl.value = ''; qEl.blur(); location.hash = '#/stock/' + code; }
 
 // ---------- 路由 ----------
-var ROUTES = ['stock', 'radar', 'market', 'ideas', 'plan', 'backtest', 'supply', 'season', 'settle', 'notes'];
+var ROUTES = ['home', 'stock', 'radar', 'market', 'ideas', 'plan', 'backtest', 'supply', 'season', 'settle', 'notes'];
 function parseHash() {
   var hsh = (location.hash || '').replace(/^#\/?/, ''), parts = hsh.split('/').filter(Boolean);
-  var route = parts[0] || '', arg = parts[1] || '';
+  var route = parts[0] || 'home', arg = parts[1] || '';
   if (ROUTES.indexOf(route) < 0) { route = 'stock'; arg = ''; }
   return { route: route, arg: arg };
 }
@@ -125,11 +125,12 @@ function showRoute() {
   state.route = r;
   $$('#mainnav a').forEach(function (a) { if (a.dataset.route === r.route) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   ROUTES.forEach(function (x) { $('#view-' + x).hidden = x !== r.route; });
-  var tfSeg = $('#tfD').parentNode; tfSeg.style.visibility = (r.route === 'stock' || r.route === 'radar') ? 'visible' : 'hidden';
+  var tfSeg = $('#tfD').parentNode; tfSeg.style.visibility = (r.route === 'stock' || r.route === 'radar' || r.route === 'home') ? 'visible' : 'hidden';
   document.body.dataset.route = r.route;
   if (r.route === 'stock') { renderStock(r.arg); try { localStorage.setItem('hub.last', r.arg); } catch (e) { } }
   else if (r.route === 'radar') showRadarSub(r.arg || 'analyze');
   else if (r.route === 'supply') { window.__subind = (state.supply && state.supply.sub) || {}; mountModule('supply').then(function () { if (r.arg && window.__supplyAPI) window.__supplyAPI.openCompany(r.arg, false); }); }
+  else if (r.route === 'home') renderHome();
   else if (r.route === 'market') renderMarket();
   else if (r.route === 'ideas') renderIdeas(r.arg);
   else if (r.route === 'plan') renderPlan();
@@ -140,7 +141,7 @@ function showRoute() {
 }
 window.addEventListener('hashchange', showRoute);
 $('#tfD').addEventListener('click', function () { setTF('D'); }); $('#tfW').addEventListener('click', function () { setTF('W'); });
-function setTF(tf) { state.tf = tf; $('#tfD').setAttribute('aria-pressed', tf === 'D'); $('#tfW').setAttribute('aria-pressed', tf === 'W'); if (state.route && state.route.route === 'stock') renderStock(state.route.arg); if (state.radarCurrent) radarAnalyze(state.radarCurrent.code); }
+function setTF(tf) { state.tf = tf; $('#tfD').setAttribute('aria-pressed', tf === 'D'); $('#tfW').setAttribute('aria-pressed', tf === 'W'); if (state.route && state.route.route === 'stock') renderStock(state.route.arg); if (state.route && state.route.route === 'home') { state.hmRange = null; renderHome(); } if (state.radarCurrent) radarAnalyze(state.radarCurrent.code); }
 
 // ---------- 主題同步（給 Shadow DOM 模組） ----------
 function syncTheme() { var t = document.documentElement.getAttribute('data-theme'); $$('.modhost').forEach(function (el) { if (t) el.setAttribute('data-theme', t); else el.removeAttribute('data-theme'); }); }
