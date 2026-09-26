@@ -85,6 +85,23 @@ body{padding-block:0 40px}
 .wt i{position:absolute;inset:0 auto 0 0;background:var(--accent)}
 .wt i.over{background:var(--up)}
 table.trbl{min-width:0}
+.hmgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.hmgrid{grid-template-columns:minmax(0,1fr)}}
+.hmcard{display:flex;flex-direction:column;gap:8px}
+.hmhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.hmname{font-weight:700;font-size:15px}
+.hmpx{font-size:22px;font-weight:700}
+.hmcv{width:100%;height:250px;display:block}
+.hmwhy{margin:0 0 0 18px;padding:0;font-size:12.5px;color:var(--ink2);line-height:1.7}
+.hmfoot{font-size:11.5px}
+.vb{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:700;font-size:13px;white-space:nowrap}
+.vb.buy1,.vb.buy2{background:var(--long-bg);color:var(--up)} .vb.buy2{box-shadow:inset 0 0 0 1.5px var(--up)}
+.vb.risk1{background:var(--short-bg);color:var(--dn)} .vb.risk2{background:var(--dn);color:#fff}
+.vb.hold{background:var(--chip);color:var(--ink)} .vb.watch{background:var(--warn-bg);color:var(--warn)}
+.hmsum{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:16px;align-items:center}
+.hmsumtxt{font-size:13.5px;line-height:1.7}
+.hmexpo{text-align:right;text-decoration:none;color:var(--ink)}
+@media (max-width:560px){.hmsum{grid-template-columns:minmax(0,1fr)}.hmexpo{text-align:left}}
 .dial{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:center}
 @media (max-width:560px){.dial{grid-template-columns:minmax(0,1fr);gap:10px}.dial .big{font-size:44px}}
 #mkExpo{display:flex!important;flex-wrap:wrap;gap:6px}
@@ -220,6 +237,7 @@ table.trbl{min-width:0}
   </header>
 
   <nav class="mainnav" id="mainnav">
+    <a href="#/home" data-route="home"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg>大盤總覽</a>
     <a href="#/stock" data-route="stock"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 5-8 4 5"/></svg>個股總覽</a>
     <a href="#/radar" data-route="radar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 12l6-4M12 3v3M21 12h-3"/></svg>型態雷達</a>
     <a href="#/market" data-route="market"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>市場水位</a>
@@ -232,6 +250,7 @@ table.trbl{min-width:0}
     <a href="#/notes" data-route="notes"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z M9 12h6M9 16h6"/></svg>研究筆記</a>
   </nav>
 
+  <section id="view-home" hidden><div id="homeBody" class="loading">載入中…</div></section>
   <section id="view-stock" hidden><div id="stockBody" class="loading">載入中…</div></section>
 
   <section id="view-radar" hidden>

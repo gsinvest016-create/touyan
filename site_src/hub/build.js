@@ -30,7 +30,7 @@ let roster = {};
 try { const sup = JSON.parse(zlib.gunzipSync(Buffer.from(JSON.parse(fs.readFileSync(path.join(here, 'gen', 'supply.json'), 'utf8')).z, 'base64')).toString()); sup.roster.forEach(r => roster[r[0]] = r[1]); sup.data.forEach(d => roster[d.c] = d.n); } catch (e) { console.warn('no supply roster', e.message); }
 
 // 指數（市場水位）：bars 內 market=IDX 的代碼，加上示範／備援檔 demo_raw/indices.json（INDICES 環境變數可指定）
-const IDX_NAMES = { TWII: '台股加權指數', TWOII: '櫃買指數', GSPC: '標普 500', IXIC: '那斯達克', SOX: '費城半導體' };
+const IDX_NAMES = { TWII: '台股加權指數', TWOII: '櫃買指數', GSPC: '標普 500', IXIC: '那斯達克', SOX: '費城半導體', TNX: '美國10年期公債殖利率' };
 const indices = {};
 const idxFile = process.env.INDICES || path.join(here, '..', 'demo_raw', 'indices.json');
 try { const d = JSON.parse(fs.readFileSync(idxFile, 'utf8')); Object.keys(d).forEach(k => { if (Array.isArray(d[k]) && d[k].length >= 100) indices[k] = d[k]; }); } catch (e) { }
