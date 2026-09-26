@@ -131,7 +131,7 @@ def us_universe(mode):
 
 # ---------------- Yahoo 歷史資料 ----------------
 # 指數（市場水位用）：代碼 → (Yahoo 符號, 名稱)
-INDICES = {'TWII': ('^TWII', '台股加權指數'), 'TWOII': ('^TWOII', '櫃買指數'), 'GSPC': ('^GSPC', '標普 500'), 'IXIC': ('^IXIC', '那斯達克'), 'SOX': ('^SOX', '費城半導體')}
+INDICES = {'TWII': ('^TWII', '台股加權指數'), 'TWOII': ('^TWOII', '櫃買指數'), 'GSPC': ('^GSPC', '標普 500'), 'IXIC': ('^IXIC', '那斯達克'), 'SOX': ('^SOX', '費城半導體'), 'TNX': ('^TNX', '美國10年期公債殖利率')}
 
 def yahoo_symbol(code, mk):
     if mk == 'IDX': return INDICES[code][0]
