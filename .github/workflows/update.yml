@@ -5,7 +5,7 @@ on:
     - cron: '40 23 * * 0-5'   # 台北 07:40（美股收盤後；UTC 週日=台北週一）
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write     # 只用於「保持排程啟用」的空 commit
   pages: write
   id-token: write
 concurrency:
@@ -23,25 +23,61 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: 還原價量快取
+      - name: 還原價量快取（每檔歷史＋上次的股票清單）
         uses: actions/cache@v4
         with:
-          path: updater/cache
+          path: |
+            updater/cache
+            updater/output/names.json
+            updater/output/markets.json
           key: bars-cache-${{ github.run_id }}
           restore-keys: |
             bars-cache-
       - name: 抓取台美股與指數價量
         run: python updater/update_data.py --workers 4
+      - name: 檢查資料是否完整（不完整就不發佈，網站維持上一版）
+        run: |
+          python - <<'PY'
+          import json, sys
+          s = json.load(open('updater/output/status.json'))
+          print(s)
+          if s.get('tw', 0) < 1500 or s.get('us', 0) < 800:
+              print('::error::抓到的股票太少（台股 %s、美股 %s），這次不發佈' % (s.get('tw'), s.get('us'))); sys.exit(1)
+          PY
       - name: 建置網站
         run: |
           bash site_src/rebuild.sh "$GITHUB_WORKSPACE/updater/output"
           cp site_src/hub/dist/index.standalone.html site_src/hub/dist/index.html
           rm -f site_src/hub/dist/files.json site_src/hub/dist/files_abs.json
-          cat updater/output/status.json
+      - name: 執行摘要
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, gzip
+          s = json.load(open('updater/output/status.json'))
+          m = json.load(open('updater/output/markets.json'))
+          idx = sorted(k for k, v in m.items() if v == 'IDX')
+          print('## 投研總台更新')
+          print(f"- 價量最新日期：**{s['latest']}**　執行時間：{s['updated']}")
+          print(f"- 台股 {s['tw']} 檔、美股 {s['us']} 檔、指數 {len(idx)} 個（{', '.join(idx)}）")
+          print(f"- 抓取失敗 {s['fail']}、無資料 {s['empty']}")
+          if 'TWOII' not in idx: print('- ⚠️ 櫃買指數這次沒抓到（沿用上次資料；落後超過 5 天時，市場水位改為只用加權計算）')
+          PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site_src/hub/dist
+      - name: 保持排程啟用（公開倉庫 60 天沒有 commit，GitHub 會自動停掉排程）
+        if: github.event_name == 'schedule'
+        run: |
+          last=$(git log -1 --format=%ct)
+          days=$(( ( $(date +%s) - last ) / 86400 ))
+          echo "距上次 commit $days 天"
+          if [ "$days" -ge 40 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "keepalive：保持每日排程啟用"
+            git push
+          fi
   deploy:
     needs: build
     runs-on: ubuntu-latest
