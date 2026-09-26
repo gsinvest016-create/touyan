@@ -1,18 +1,25 @@
-# 投研總台 — 自架網站版（GitHub Pages）
+# 投研總台（自架版）
 
-這個資料夾放到 GitHub 之後，GitHub 會每天自動抓價量、建置網站並發佈，網址是
-`https://<你的帳號>.github.io/<倉庫名稱>/`，不需要開電腦、也不需要透過 Claude。
+網址：**https://gsinvest016-create.github.io/touyan/**
 
-## 一次性設定（約 10 分鐘）
-1. 到 https://github.com 註冊（免費）。
-2. 右上角「+」→ **New repository**：名稱填 `touyan`（或任何英文名），選 **Public**（Pages 免費方案需公開），按 Create repository。
-3. 在新倉庫頁面點 **uploading an existing file**，把這個資料夾裡的**所有內容**（含 `.github` 資料夾）拖進去，按 **Commit changes**。
-   - 若瀏覽器不能拖整個資料夾，改用 GitHub Desktop（https://desktop.github.com）：File → Add local repository → 選這個資料夾 → Publish。
-4. 倉庫 **Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**。
-5. 倉庫 **Actions** 分頁 → 左側「更新資料並發佈網站」→ **Run workflow**。第一次要抓 2 年資料，約 20–40 分鐘；之後每天自動跑兩次（台北 15:40 與 07:40），每次約 8 分鐘。
-6. 跑完後 Settings → Pages 會顯示網址；把它加到手機主畫面即可。
+台美股約 3,900 檔的技術分析網站：個股總覽（K 線、形態、VCP、神奇九轉／十三轉、支撐壓力、進出場與期望值）、型態雷達、市場水位、交易點子、每日計畫、策略回測、供應鏈地圖、週季節性、月結算效應。
 
-## 之後
-- 完全自動，不用管。Actions 分頁可看每次執行紀錄；失敗會寄信通知。
-- 網站功能與 Claude 版相同，差別：「請 Claude 點評」按鈕在這裡不會作用（那是 Claude 網頁內建功能），自選股只存在該瀏覽器。
-- 要改網站內容，把新的 `site_src` 覆蓋上傳即可，下次執行會採用。
+## 自動更新
+- 每個交易日台北 **15:40**（台股收盤後）與 **07:40**（美股收盤後）自動執行 `.github/workflows/update.yml`：抓價量 → 建置 → 發佈，約 8–10 分鐘。
+- 資料不完整（台股 < 1,500 檔或美股 < 800 檔）時不發佈，網站維持上一版，GitHub 會寄信通知失敗。
+- 公開倉庫 60 天沒有 commit 時 GitHub 會停掉排程；工作流程會在距上次 commit 滿 40 天時自動補一個空 commit，保持排程啟用。
+- 想立刻更新：**Actions → 更新資料並發佈網站 → Run workflow**。每次執行的摘要（最新日期、檔數、失敗數、櫃買指數有沒有抓到）在該次執行頁面的 Summary。
+
+## 檔案
+| 路徑 | 內容 |
+|---|---|
+| `updater/update_data.py` | 抓台股（證交所／櫃買清單）、美股（S&P 1500 + Nasdaq-100）、指數的日 K（Yahoo；櫃買指數用鉅亨網備援） |
+| `site_src/engine/engine.js` | 技術分析引擎（形態、VCP、九轉／十三轉、交易計畫、回測） |
+| `site_src/hub/js/*.js`、`template.html` | 網站頁面 |
+| `site_src/hub/gen/` | 供應鏈、季節性、月結算的靜態資料 |
+| `site_src/rebuild.sh` | 建置腳本（工作流程會呼叫） |
+
+## 修改網站
+在 Claude 裡說要改什麼，Claude 改好、測試後會直接用瀏覽器上傳到這個倉庫；下一次自動執行（或手動 Run workflow）後生效。
+
+所有內容為技術面規則推演與歷史統計，不構成投資建議。
