@@ -98,6 +98,37 @@ def wiki_table_symbols(url, col_names=('Symbol', 'Ticker', 'Ticker symbol')):
         if out: break
     return out
 
+# Nasdaq-100 裡不在 S&P 1500 的成分股（2026-09 名單；線上來源都失敗時才用）
+NDX_EXTRA = {'ASML': 'ASML Holding', 'MSTR': 'Strategy', 'ALNY': 'Alnylam Pharmaceuticals', 'MELI': 'MercadoLibre', 'NBIS': 'Nebius Group',
+             'SHOP': 'Shopify', 'CCEP': 'Coca-Cola Europacific Partners', 'PDD': 'PDD Holdings', 'RKLB': 'Rocket Lab', 'ARM': 'Arm Holdings',
+             'TRI': 'Thomson Reuters', 'FER': 'Ferrovial', 'ALAB': 'Astera Labs', 'CRWV': 'CoreWeave'}
+
+def nasdaq100_symbols():
+    """Nasdaq-100 成分股：先用 Nasdaq 官方 API，失敗再試維基百科，最後用內建名單。
+    （維基百科 Nasdaq-100 條目已拿掉成分股表格，所以舊寫法一直抓到 0 檔）"""
+    try:
+        req = urllib.request.Request('https://api.nasdaq.com/api/quote/list-type/nasdaq100', headers={
+            'User-Agent': UA['User-Agent'], 'Accept': 'application/json, text/plain, */*',
+            'Origin': 'https://www.nasdaq.com', 'Referer': 'https://www.nasdaq.com/'})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            data = r.read()
+            if r.headers.get('Content-Encoding') == 'gzip': data = gzip.decompress(data)
+        rows = ((json.loads(data.decode('utf-8', 'replace')).get('data') or {}).get('data') or {}).get('rows') or []
+        out = {}
+        for row in rows:
+            sym = (row.get('symbol') or '').strip().replace('.', '-')
+            nm = (row.get('companyName') or sym).strip()
+            for _ in range(4):   # 去掉「Common Stock」「Class A」「Ordinary Shares」等後綴
+                nm = re.sub(r'\s+(Common Stock|Common Shares|Capital Stock|Class [A-C]|Series [A-C]|Ordinary Shares|American Depositary Shares|New York Registry Shares|Subordinate Voting Shares|\([A-Za-z]+\))$', '', nm).strip()
+            if re.fullmatch(r'[A-Z]{1,5}(-[A-Z])?', sym): out[sym] = nm[:40]
+        if len(out) >= 90: return out
+    except Exception as e:
+        log('  ! Nasdaq-100 官方 API 失敗', str(e)[:80])
+    got = wiki_table_symbols('https://en.wikipedia.org/wiki/Nasdaq-100')
+    if len(got) >= 90: return got
+    log('  ! Nasdaq-100 線上名單取不到，改用內建名單（只補不在 S&P 1500 的成分股）')
+    return dict(NDX_EXTRA)
+
 def us_universe(mode):
     names, markets = {}, {}
     if mode == 'all':
@@ -116,13 +147,16 @@ def us_universe(mode):
     else:
         srcs = [('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies', 'S&P 500'),
                 ('https://en.wikipedia.org/wiki/List_of_S%26P_400_companies', 'S&P 400'),
-                ('https://en.wikipedia.org/wiki/List_of_S%26P_600_companies', 'S&P 600'),
-                ('https://en.wikipedia.org/wiki/Nasdaq-100', 'Nasdaq-100')]
+                ('https://en.wikipedia.org/wiki/List_of_S%26P_600_companies', 'S&P 600')]
         for u, label in srcs:
             got = wiki_table_symbols(u)
             log(f'  {label}: {len(got)}')
             for k, v in got.items():
                 names.setdefault(k, v); markets[k] = 'US'
+        got = nasdaq100_symbols()
+        log(f'  Nasdaq-100: {len(got)}')
+        for k, v in got.items():
+            names.setdefault(k, v); markets[k] = 'US'
         # 常見大型 ETF
         for k, v in {'SPY': 'SPDR S&P 500 ETF', 'QQQ': 'Invesco QQQ', 'IWM': 'iShares Russell 2000', 'DIA': 'SPDR Dow Jones', 'SMH': 'VanEck Semiconductor', 'SOXX': 'iShares Semiconductor', 'TLT': 'iShares 20+ Treasury', 'GLD': 'SPDR Gold'}.items():
             names.setdefault(k, v); markets[k] = 'US'
@@ -191,7 +225,7 @@ def fetch_cnyes(sym, days):
         except Exception: return None
         ts = d.get('t') or []
         for i, tt in enumerate(ts):
-            day = _dt.datetime.utcfromtimestamp(tt).strftime('%Y-%m-%d')
+            day = _dt.datetime.fromtimestamp(tt, _dt.timezone.utc).strftime('%Y-%m-%d')
             out[day] = [day, d['o'][i], d['h'][i], d['l'][i], d['c'][i], int(d['v'][i] or 0)]
         cur = lo
     rows = [out[k] for k in sorted(out) if out[k][4]]
