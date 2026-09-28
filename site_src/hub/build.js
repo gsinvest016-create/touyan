@@ -16,7 +16,7 @@ fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'data', 'chunks'), { recursive: true }); fs.mkdirSync(path.join(out, 'modules'), { recursive: true });
 
 // 頁面
-let html = fs.readFileSync(path.join(here, 'template.html'), 'utf8');
+let html = fs.readFileSync(path.join(here, 'template.html'), 'utf8').replace('__HUB_BUILD__', () => new Date().toISOString());
 const baseCss = fs.readFileSync(path.join(here, 'base.css'), 'utf8').replace(/^<style>\s*/, '').replace(/\s*<\/style>\s*$/, '');
 const appJs = fs.readdirSync(path.join(here, 'js')).filter(f => f.endsWith('.js')).sort().map(f => fs.readFileSync(path.join(here, 'js', f), 'utf8')).join('\n');
 html = html.replace('/*__BASECSS__*/', baseCss).replace('/*__ENGINE__*/', () => fs.readFileSync(path.join(here, '..', 'engine', 'engine.js'), 'utf8')).replace('/*__APP__*/', () => '(function(){\n"use strict";\n' + appJs + '\n})();');
