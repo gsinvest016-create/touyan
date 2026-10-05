@@ -112,10 +112,10 @@ document.addEventListener('keydown', function (e) { if (e.key === '/' && documen
 function goStock(code) { suggEl.hidden = true; qEl.value = ''; qEl.blur(); location.hash = '#/stock/' + code; }
 
 // ---------- 路由 ----------
-var ROUTES = ['home', 'stock', 'radar', 'market', 'ideas', 'plan', 'backtest', 'supply', 'season', 'settle', 'notes'];
+var ROUTES = ['market', 'home', 'stock', 'radar', 'ideas', 'plan', 'backtest', 'supply', 'season', 'settle', 'notes'];
 function parseHash() {
   var hsh = (location.hash || '').replace(/^#\/?/, ''), parts = hsh.split('/').filter(Boolean);
-  var route = parts[0] || 'home', arg = parts[1] || '';
+  var route = parts[0] || 'market', arg = parts[1] || '';
   if (ROUTES.indexOf(route) < 0) { route = 'stock'; arg = ''; }
   return { route: route, arg: arg };
 }
