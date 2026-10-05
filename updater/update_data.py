@@ -55,8 +55,10 @@ def tw_universe():
     # 上市（含 ETF）：證交所每日行情 API 有代號+名稱
     t = http_get('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL')
     n_listed = 0
-    if t:
-        for row in json.loads(t):
+    try: rows_l = json.loads(t) if t else []
+    except Exception: rows_l = []
+    if rows_l:
+        for row in rows_l:
             code, name = row.get('Code', '').strip(), row.get('Name', '').strip()
             if re.fullmatch(r'\d{4}[A-Z]?|00\d{3,4}[A-Z]?', code):
                 names[code] = name; markets[code] = 'TW'; n_listed += 1
@@ -65,15 +67,36 @@ def tw_universe():
     # 上櫃
     t2 = http_get('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes')
     n_otc = 0
-    if t2:
-        for row in json.loads(t2):
+    try: rows_o = json.loads(t2) if t2 else []
+    except Exception: rows_o = []
+    if rows_o:
+        for row in rows_o:
             code = (row.get('SecuritiesCompanyCode') or row.get('Code') or '').strip()
             name = (row.get('CompanyName') or row.get('Name') or '').strip()
             if re.fullmatch(r'\d{4}[A-Z]?|00\d{3,4}[A-Z]?', code):
                 names[code] = name; markets[code] = 'TWO'; n_otc += 1
     else:
         log('  ! 無法取得上櫃清單（TPEx）')
-    log(f'台股清單：上市 {n_listed}、上櫃 {n_otc}')
+    # 官方清單偶爾抓不到（維護、限流）：沿用上次成功的清單，避免整個上市或上櫃市場消失
+    uni = os.path.join(CACHE_DIR, '_universe_tw.json')
+    prev = {}
+    try:
+        with open(uni, encoding='utf-8') as f: prev = json.load(f)
+    except Exception:
+        prev = {}
+    for mk, n_now, label, floor in (('TW', n_listed, '上市', 800), ('TWO', n_otc, '上櫃', 500)):
+        old_rows = {c: v for c, v in prev.items() if v[1] == mk}
+        if n_now < floor and len(old_rows) >= floor:
+            log(f'  ! {label}清單只抓到 {n_now} 檔，沿用上次的 {len(old_rows)} 檔')
+            for c, v in old_rows.items():
+                names.setdefault(c, v[0]); markets.setdefault(c, mk)
+    if n_listed >= 800 and n_otc >= 500:
+        try:
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            with open(uni, 'w', encoding='utf-8') as f: json.dump({c: [names[c], markets[c]] for c in names}, f, ensure_ascii=False)
+        except Exception as e:
+            log('  ! 無法儲存台股清單快取', str(e)[:60])
+    log(f'台股清單：上市 {n_listed}、上櫃 {n_otc}（合計 {len(names)}）')
     return names, markets
 
 def wiki_table_symbols(url, col_names=('Symbol', 'Ticker', 'Ticker symbol')):
