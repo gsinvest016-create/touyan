@@ -134,6 +134,22 @@ function mkIndexCard(key, bars, st, lv) {
     '<div class="lvl" style="background:var(--panel2);border-radius:8px;padding:6px 8px;margin:4px 0"><span class="p">' + fmt.p(c) + '</span><span>現價</span><span class="to">' + lv.now + '%</span><span class="d"></span></div>' +
     '<div style="font-size:12px;color:var(--ink3);margin:2px 0">向下：跌破就減碼到</div>' + (lv.below.length ? lv.below.map(function (x) { return rowL(x, 'dn'); }).join('') : '<div class="note" style="margin:0">下方 25% 內沒有關鍵支撐。</div>') + '</div>';
 }
+// 季節性：加權、標普、那斯達克 歷年同一週的漲跌幅（本週起 5 週）與本月；只當風向參考，不計入水位分數
+function mkSeasonCard() {
+  var win = state.seasonWin || '20';
+  var blocks = ['TWII', 'GSPC', 'IXIC'].map(function (k) { return seasonCalc(k, win); }).filter(Boolean);
+  if (!blocks.length) return '<div class="card"><h3>季節性</h3><div class="note" style="margin:0">季節性資料未載入。</div></div>';
+  var cls = function (v) { return v > 0 ? 'up' : v < 0 ? 'dn' : ''; };
+  var vtxt = { tail: '<span class="pill long">順風</span>', head: '<span class="pill short">逆風</span>', flat: '<span class="pill">中性</span>' };
+  var html = '<div class="card season"><h3>季節性：歷年同一週的漲跌幅<span class="r"><span class="seg" style="font-size:11px">' + [['10', '近 10 年'], ['20', '近 20 年'], ['all', '全部']].map(function (w) { return '<button data-sw="' + w[0] + '" aria-pressed="' + (win === w[0]) + '">' + w[1] + '</button>'; }).join('') + '</span></span></h3>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px 22px">' + blocks.map(function (b) {
+    return '<div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><b>' + IDXN[b.idx] + '</b>' + vtxt[b.verdict] + '<span style="font-size:11.5px;color:var(--ink3)">' + (b.rows[0] && b.rows[0].n ? '樣本 ' + b.rows[0].n + ' 年' : '') + '</span></div>' +
+      '<div class="seasonwrap"><table class="seasontbl"><thead><tr><th>週</th><th>平均</th><th>中位</th><th>上漲機率</th></tr></thead><tbody>' + b.rows.map(function (r, k) { return '<tr class="' + (r.now ? 'now' : '') + '"><td>' + (r.now ? '本週 ' : k === 1 ? '下週 ' : '') + '<span style="color:var(--ink3)">' + fmt.date(r.from) + '–' + fmt.date(r.to) + '</span></td><td class="' + cls(r.mean) + '">' + fmt.pct(r.mean) + '</td><td class="' + cls(r.med) + '">' + fmt.pct(r.med) + '</td><td>' + (r.win == null ? '—' : r.win.toFixed(0) + '%<span class="winbar"><i style="width:' + r.win + '%"></i></span>') + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+      '<div style="font-size:12px;color:var(--ink2);margin-top:6px">' + b.month.m + ' 月整月：平均 <b class="num ' + cls(b.month.mean) + '">' + fmt.pct(b.month.mean) + '</b>，上漲機率 <b class="num">' + (b.month.win == null ? '—' : b.month.win.toFixed(0) + '%') + '</b>（' + b.month.n + ' 年）</div></div>';
+  }).join('') + '</div>';
+  html += '<div class="note">每一列是該指數歷年「同一週」的漲跌幅統計（平均、中位數、上漲機率），本週以底色標示；順風／逆風看本週加下週。季節性在回測中不顯著，只當風向參考，不計入上面的水位分數：逆風時加碼等收盤確認、分批進；順風時照建議水位執行即可。<a href="#/season">完整季節性圖表 →</a></div></div>';
+  return html;
+}
 function renderMarket() {
   var body = $('#marketBody'); body.className = '';
   var M = mkModel();
@@ -148,6 +164,7 @@ function renderMarket() {
     (cb.caps.length || cb.floors.length ? '<div class="note">' + cb.caps.map(function (x) { return '上限 ' + x.v + '%：' + x.why; }).concat(cb.floors.map(function (x) { return '下限 ' + x.v + '%：' + x.why; })).join('；') + '。</div>' : '') + '</div>';
   // 兩個指數
   html += '<div class="two-eq" style="margin-top:14px">' + mkIndexCard('TWII', M.tw, M.twS, M.lvTW) + (M.otc ? mkIndexCard('TWOII', M.otc, M.otcS, M.lvOTC) : '<div class="card"><h3>櫃買指數</h3><div class="note" style="margin:0">' + (M.otcStale ? '櫃買指數資料停在 ' + esc(M.otcStale) + '（本次抓取失敗），為避免用過期數字，水位暫時只用加權指數與廣度計算。' : '尚無櫃買指數資料。') + '</div></div>') + '</div>';
+  html += '<div style="margin-top:14px">' + mkSeasonCard() + '</div>';
   // 執行規則
   html += '<div class="card" style="margin-top:14px"><h3>執行規則（照表做，不臨場判斷）</h3><div class="rule"><b>水位怎麼算</b>總分 ≥80 → 100%；65–79 → 80%；50–64 → 60%；35–49 → 40%；20–34 → 20%；&lt;20 → 清倉。加權在下彎季線之下上限 40%、在年線之下上限 20%、25 日內 ≥5 個分配日上限 50%、櫃買跌破季線而加權未破上限 60%；出現反彈確認日至少 40%。</div><div class="rule"><b>什麼時候動</b>建議值與目前水位差 ≥15% 才動作；差不到 40% 的調整要連續 3 天同一建議再做，差 ≥40%（例如跌破季線、年線）當天收盤確認、隔天開盤就做。</div><div class="rule"><b>減碼順序</b>跌破價位當天收盤確認後隔天執行：先砍虧損中、跌破自身停損、第四階段的部位；獲利中的強勢股最後減。</div><div class="rule"><b>加碼順序</b>突破價位當天收盤確認後，只加交易點子頁通過檢核（≥5 項有利、期望值為正）的標的，分兩批；水位到達建議值就停，不因為「感覺會噴」超過。</div><div class="rule"><b>清倉條件</b>建議水位 0%（加權跌破年線且年線下彎、季線下彎）。清倉後不猜底；等反彈確認日或站回季線且分配日 ≤2 才重新進場，第一批 20–40%。</div></div>';
   // 回測

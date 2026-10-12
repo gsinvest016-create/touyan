@@ -33,7 +33,7 @@ function seasonCard(meta) {
   html += '<div class="note">季節性是指數（' + idxs.map(function (k) { return IDXN[k]; }).join('／') + '）的歷史逐週統計，反映大盤風向而非個股本身；順風時可放大部位、逆風時縮小或縮短持有期，但不能取代形態與停損。<a href="#/season">完整季節性圖表 →</a></div></div>';
   return html;
 }
-document.addEventListener('click', function (e) { var b = e.target.closest('[data-sw]'); if (!b) return; state.seasonWin = b.dataset.sw; try { localStorage.setItem('hub.seasonWin', state.seasonWin); } catch (x) { } if (state.route && state.route.route === 'stock') renderStock(state.route.arg); });
+document.addEventListener('click', function (e) { var b = e.target.closest('[data-sw]'); if (!b) return; state.seasonWin = b.dataset.sw; try { localStorage.setItem('hub.seasonWin', state.seasonWin); } catch (x) { } if (state.route && state.route.route === 'stock') renderStock(state.route.arg); else if (state.route && state.route.route === 'market') renderMarket(); });
 
 // ---------- 月結算 ----------
 function thirdWed(y, m) { var d = new Date(y, m, 1), first = 1 + ((3 - d.getDay() + 7) % 7); return new Date(y, m, first + 14); }
